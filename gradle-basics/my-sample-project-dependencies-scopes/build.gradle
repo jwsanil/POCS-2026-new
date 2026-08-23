@@ -1,0 +1,57 @@
+plugins {
+    id 'java'
+    id 'org.springframework.boot' version '3.4.2'
+    id 'io.spring.dependency-management' version '1.1.7'
+}
+
+group = 'org.example'
+version = '1.0-SNAPSHOT'
+
+java {
+    sourceCompatibility = JavaVersion.VERSION_17
+    targetCompatibility = JavaVersion.VERSION_17
+}
+
+repositories {
+    mavenCentral()
+}
+dependencies {
+
+    // Application
+    // implementation scope
+    implementation 'org.apache.commons:commons-lang3:3.18.0'
+
+    // Spring Boot JDBC
+    // implementation scope
+    implementation 'org.springframework.boot:spring-boot-starter-jdbc'
+
+    // H2 database
+    // runtimeOnly scope
+    runtimeOnly 'com.h2database:h2'
+
+    // Lombok
+    // compileOnly scope
+    compileOnly 'org.projectlombok:lombok:1.18.38'
+    // annotationProcessor scope
+    annotationProcessor 'org.projectlombok:lombok:1.18.38'
+
+    // Tests
+    /*
+    // testImplementation scope
+    testImplementation platform('org.junit:junit-bom:5.12.2')
+
+    // testImplementation scope
+    testImplementation 'org.junit.jupiter:junit-jupiter'
+
+    // testRuntimeOnly scope
+    testRuntimeOnly 'org.junit.platform:junit-platform-launcher:1.12.2'
+    */
+
+    // testImplementation scope
+    // Already includes JUnit Jupiter and JUnit Platform Launcher
+    testImplementation 'org.springframework.boot:spring-boot-starter-test'
+
+}
+test {
+    useJUnitPlatform()
+}

@@ -1,0 +1,106 @@
+plugins {
+    id 'java-library'
+    id 'org.springframework.boot' version '3.4.2'
+    id 'io.spring.dependency-management' version '1.1.7'
+}
+
+group = 'org.example'
+version = '1.0-SNAPSHOT'
+
+java {
+    sourceCompatibility = JavaVersion.VERSION_17
+    targetCompatibility = JavaVersion.VERSION_17
+}
+
+repositories {
+    mavenCentral()
+}
+dependencies {
+
+    // Implementation
+    implementation 'org.apache.commons:commons-lang3:3.18.0'
+
+    // API - exposed to consumers of this library
+    api 'com.google.guava:guava:33.3.1-jre'
+
+
+    // Spring Boot / BOM-managed dependencies
+    implementation 'org.springframework.boot:spring-boot-starter-web'
+    implementation 'org.springframework.boot:spring-boot-starter-jdbc'
+    implementation 'org.springframework.boot:spring-boot-starter-data-jpa'
+    implementation 'org.springframework.boot:spring-boot-starter-validation'
+    implementation 'org.springframework.boot:spring-boot-starter-security'
+    implementation 'org.springframework.boot:spring-boot-starter-actuator'
+    implementation 'org.springframework.kafka:spring-kafka'
+    implementation 'org.springframework.boot:spring-boot-starter-data-redis'
+    implementation 'org.springframework.boot:spring-boot-starter-data-mongodb'
+
+
+    // Jackson - already comes transitively from starter-web
+    implementation 'com.fasterxml.jackson.core:jackson-databind'
+
+
+
+
+    // Dependency exclusion example
+    implementation('org.springframework.boot:spring-boot-starter-thymeleaf') {
+        exclude group: 'org.apache.tomcat.embed', module: 'tomcat-embed-core'
+    }
+
+
+    // Runtime dependencies
+    runtimeOnly 'org.postgresql:postgresql'
+    runtimeOnly 'com.h2database:h2'
+
+
+    // Lombok
+    compileOnly 'org.projectlombok:lombok:1.18.38'
+    annotationProcessor 'org.projectlombok:lombok:1.18.38'
+
+
+    // Tests
+    testImplementation 'org.springframework.boot:spring-boot-starter-test'
+
+}
+// Resolve the version conflict
+/*configurations.configureEach {
+    resolutionStrategy {
+        force 'org.checkerframework:checker-qual:3.48.3'
+    }
+}*/
+
+
+
+// Custom dependency version rule
+configurations.configureEach {
+    resolutionStrategy.eachDependency { details ->
+
+        if (details.requested.group == 'org.checkerframework' &&
+                details.requested.name == 'checker-qual') {
+
+            println "Requested checker-qual version: ${details.requested.version}"
+
+            details.useVersion('3.48.3')
+
+            details.because('Use the approved checker-qual version')
+        }
+    }
+}
+
+configurations.configureEach {
+    resolutionStrategy {
+        failOnVersionConflict()
+    }
+}
+
+
+
+// Dependency locking
+dependencyLocking {
+    lockAllConfigurations()
+}
+
+
+test {
+    useJUnitPlatform()
+}

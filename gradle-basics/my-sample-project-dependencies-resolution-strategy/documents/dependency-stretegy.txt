@@ -1,0 +1,763 @@
+# Gradle Dependency Management Strategies
+
+## 1. Transitive Dependencies
+
+A transitive dependency is a dependency that is brought into your project indirectly by another dependency.
+
+For example:
+
+```text
+spring-boot-starter-web
+        |
+        +-- spring-web
+        +-- spring-webmvc
+        +-- jackson
+        +-- tomcat
+        +-- ...
+```
+
+You directly declare:
+
+```gradle
+implementation 'org.springframework.boot:spring-boot-starter-web'
+```
+
+But Spring Boot's web starter brings several other libraries automatically.
+
+Therefore, you normally do not need to declare every transitive dependency manually.
+
+---
+
+## 2. Dependency Conflicts
+
+A dependency conflict occurs when two or more libraries require different versions of the same dependency.
+
+For example:
+
+```text
+Library A
+    |
+    +-- checker-qual:3.48.3
+
+Library B
+    |
+    +-- checker-qual:3.43.0
+```
+
+Your project receives:
+
+```text
+checker-qual:3.48.3
+checker-qual:3.43.0
+```
+
+Gradle must resolve the conflict.
+
+By default, Gradle normally selects the highest version:
+
+```text
+3.48.3
+3.43.0
+   |
+   v
+3.48.3 selected
+```
+
+To investigate the conflict:
+
+```bash
+gradlew.bat dependencyInsight --dependency checker-qual --configuration compileClasspath
+```
+
+This helps identify which dependencies are requesting each version.
+
+### failOnVersionConflict()
+
+You can make Gradle fail whenever multiple versions are requested:
+
+```gradle
+configurations.configureEach {
+    resolutionStrategy {
+        failOnVersionConflict()
+    }
+}
+```
+
+For example:
+
+```text
+checker-qual:3.48.3
+checker-qual:3.43.0
+        |
+        v
+failOnVersionConflict()
+        |
+        v
+BUILD FAILED
+```
+
+This is useful when you want to investigate dependency conflicts instead of allowing Gradle to resolve them automatically.
+
+### force()
+
+You can explicitly force a particular version:
+
+```gradle
+configurations.configureEach {
+    resolutionStrategy {
+        force 'org.checkerframework:checker-qual:3.48.3'
+    }
+}
+```
+
+Then:
+
+```text
+checker-qual:3.48.3
+checker-qual:3.43.0
+        |
+        v
+force 3.48.3
+        |
+        v
+checker-qual:3.48.3
+```
+
+For a learning example where the objective is to resolve this specific conflict, use:
+
+```gradle
+configurations.configureEach {
+    resolutionStrategy {
+        force 'org.checkerframework:checker-qual:3.48.3'
+    }
+}
+```
+
+---
+
+## 3. BOM / Dependency Management
+
+BOM stands for Bill of Materials.
+
+A BOM defines compatible versions of a group of related libraries.
+
+Spring Boot provides dependency management for many commonly used libraries.
+
+Because Spring Boot manages the versions, you can write:
+
+```gradle
+implementation 'org.springframework.boot:spring-boot-starter-web'
+implementation 'org.springframework.boot:spring-boot-starter-jdbc'
+implementation 'org.springframework.kafka:spring-kafka'
+```
+
+without specifying versions.
+
+Conceptually:
+
+```text
+Spring Boot 3.4.2
+       |
+       v
+Dependency Management / BOM
+       |
+       +-- Spring Framework version
+       +-- Jackson version
+       +-- Hibernate version
+       +-- Tomcat version
+       +-- Kafka-related versions
+       +-- Other compatible versions
+```
+
+This prevents you from manually maintaining many related dependency versions.
+
+Your plugins:
+
+```gradle
+plugins {
+    id 'java-library'
+    id 'org.springframework.boot' version '3.4.2'
+    id 'io.spring.dependency-management' version '1.1.7'
+}
+```
+
+allow Spring Boot's dependency management to control compatible versions.
+
+Therefore, normally avoid doing this for Spring Boot-managed dependencies:
+
+```gradle
+implementation 'org.springframework.boot:spring-boot-starter-web:3.4.2'
+```
+
+Instead use:
+
+```gradle
+implementation 'org.springframework.boot:spring-boot-starter-web'
+```
+
+---
+
+## 4. dependencyInsight
+
+`dependencyInsight` is used to find out why Gradle selected a particular dependency version.
+
+Example:
+
+```bash
+gradlew.bat dependencyInsight --dependency checker-qual --configuration compileClasspath
+```
+
+It can help answer:
+
+```text
+Why is checker-qual:3.48.3 being used?
+```
+
+You may find something conceptually like:
+
+```text
+Library A
+    |
+    +-- checker-qual:3.48.3
+
+Library B
+    |
+    +-- checker-qual:3.43.0
+
+Gradle
+    |
+    +-- selected checker-qual:3.48.3
+```
+
+Another example:
+
+```bash
+gradlew.bat dependencyInsight --dependency jackson-databind --configuration runtimeClasspath
+```
+
+### dependencies vs dependencyInsight
+
+```text
+gradlew dependencies
+        |
+        +-- Shows the dependency tree
+```
+
+```text
+gradlew dependencyInsight
+        |
+        +-- Explains why a particular dependency/version
+            was selected
+```
+
+`dependencyInsight` is especially useful when debugging dependency conflicts.
+
+---
+
+## 5. Excluding Dependencies
+
+Sometimes a dependency brings another dependency transitively that you do not want.
+
+For example:
+
+```gradle
+implementation('org.springframework.boot:spring-boot-starter-thymeleaf') {
+    exclude group: 'org.apache.tomcat.embed', module: 'tomcat-embed-core'
+}
+```
+
+This means:
+
+```text
+spring-boot-starter-thymeleaf
+        |
+        +-- tomcat-embed-core
+                |
+                X excluded
+```
+
+The syntax is:
+
+```gradle
+exclude group: 'group-name', module: 'module-name'
+```
+
+Example:
+
+```gradle
+implementation('some.group:some-library:1.0') {
+    exclude group: 'org.example', module: 'some-module'
+}
+```
+
+Use exclusions when there is a specific reason, such as:
+
+```text
+unwanted transitive dependency
+duplicate implementation
+incompatible dependency
+security-related replacement
+providing an alternative implementation
+```
+
+Do not routinely exclude dependencies simply to make the dependency tree smaller.
+
+---
+
+## 6. Dependency Locking
+
+Dependency locking is used to make dependency versions reproducible.
+
+Without locking, dependency resolution may change when newer versions become available, depending on how dependencies are declared and managed.
+
+Dependency locking records the resolved dependency versions.
+
+Enable locking:
+
+```gradle
+dependencyLocking {
+    lockAllConfigurations()
+}
+```
+
+Generate dependency lock information:
+
+```bash
+gradlew.bat dependencies --write-locks
+```
+
+Gradle creates dependency lock information under:
+
+```text
+gradle/
+└── dependency-locks/
+```
+
+Conceptually:
+
+```text
+Project
+   |
+   +-- Spring version
+   +-- Jackson version
+   +-- Hibernate version
+   +-- Kafka version
+   +-- Other dependency versions
+          |
+          v
+      Locked versions
+```
+
+The purpose is to make builds more reproducible across different environments and at different points in time.
+
+---
+
+## 7. api vs implementation
+
+`api` and `implementation` are especially important when creating Java libraries.
+
+For a normal application, you generally use:
+
+```gradle
+implementation 'group:name:version'
+```
+
+When creating a library, use the `java-library` plugin:
+
+```gradle
+plugins {
+    id 'java-library'
+}
+```
+
+You can then use:
+
+```gradle
+api 'org.example:public-library:1.0'
+implementation 'org.example:internal-library:1.0'
+```
+
+### api
+
+Use `api` when the dependency is part of your library's public API.
+
+Conceptually:
+
+```text
+Your Library
+     |
+     +-- api dependency
+             |
+             v
+        Consumer can see it
+```
+
+For example, if your public method exposes a class from another library:
+
+```java
+public EmployeeRepository getRepository() {
+    return repository;
+}
+```
+
+and `EmployeeRepository` comes from another dependency, that dependency may need to be declared as:
+
+```gradle
+api 'org.example:repository-library:1.0'
+```
+
+### implementation
+
+Use `implementation` when the dependency is only an internal implementation detail.
+
+For example:
+
+```java
+private final InternalUtility utility;
+```
+
+If consumers do not need to access `InternalUtility`, use:
+
+```gradle
+implementation 'org.example:internal-utility:1.0'
+```
+
+Conceptually:
+
+```text
+api
+ |
+ +-- Part of public API
+ +-- Consumers can access the dependency
+
+
+implementation
+ |
+ +-- Internal implementation detail
+ +-- Consumers do not need it on their compile classpath
+```
+
+For your current project:
+
+```gradle
+plugins {
+    id 'java-library'
+}
+```
+
+means the project can use both:
+
+```gradle
+api
+```
+
+and:
+
+```gradle
+implementation
+```
+
+For example:
+
+```gradle
+dependencies {
+
+    implementation 'org.apache.commons:commons-lang3:3.18.0'
+
+    api 'com.google.guava:guava:33.3.1-jre'
+
+}
+```
+
+Here:
+
+```text
+commons-lang3
+     |
+     +-- implementation
+     +-- internal dependency
+
+
+guava
+     |
+     +-- api
+     +-- exposed to consumers
+```
+
+For a normal Spring Boot application rather than a reusable Java library, `implementation` is normally the preferred configuration.
+
+---
+
+## 8. details.requested and useVersion()
+
+`details.requested` is a Gradle property used inside dependency resolution rules. It represents the dependency request that Gradle is currently processing.
+
+For example:
+
+```gradle
+configurations.configureEach {
+    resolutionStrategy.eachDependency { details ->
+
+        if (details.requested.group == 'com.fasterxml.jackson.core' &&
+            details.requested.name == 'jackson-databind') {
+
+            details.useVersion('2.18.3')
+        }
+    }
+}
+```
+
+Here:
+
+```gradle
+details.requested
+```
+
+represents the dependency that some library or your project requested.
+
+### Example
+
+Suppose your dependency graph is:
+
+```text
+spring-boot-starter-web
+        |
+        +---- jackson-databind:2.18.2
+```
+
+Gradle processes the request:
+
+```text
+group    = com.fasterxml.jackson.core
+name     = jackson-databind
+version  = 2.18.2
+```
+
+So:
+
+```gradle
+details.requested.group
+```
+
+gives:
+
+```text
+com.fasterxml.jackson.core
+```
+
+```gradle
+details.requested.name
+```
+
+gives:
+
+```text
+jackson-databind
+```
+
+```gradle
+details.requested.version
+```
+
+gives:
+
+```text
+2.18.2
+```
+
+### Why is it useful?
+
+It lets you write rules such as:
+
+> "Whenever somebody requests this particular dependency, use a specific version."
+
+For example:
+
+```gradle
+configurations.configureEach {
+    resolutionStrategy.eachDependency { details ->
+
+        if (details.requested.group == 'com.fasterxml.jackson.core' &&
+            details.requested.name == 'jackson-databind') {
+
+            details.useVersion('2.18.3')
+        }
+    }
+}
+```
+
+Conceptually:
+
+```text
+Dependency requests:
+
+jackson-databind:2.17.0
+        ↓
+jackson-databind:2.18.2
+        ↓
+        ↓
+eachDependency
+        ↓
+details.requested
+        ↓
+"Is this jackson-databind?"
+        ↓
+YES
+        ↓
+useVersion("2.18.3")
+```
+
+### details.requested vs details.useVersion()
+
+They have opposite purposes:
+
+```text
+details.requested
+        ↓
+"What version was requested?"
+```
+
+```text
+details.useVersion(...)
+        ↓
+"What version should Gradle use instead?"
+```
+
+For example:
+
+```gradle
+if (details.requested.name == 'jackson-databind') {
+    details.useVersion('2.18.3')
+}
+```
+
+means:
+
+> If the requested dependency is `jackson-databind`, change the version Gradle will use to `2.18.3`.
+
+You can also inspect the reason.
+
+There are other useful properties/methods on `details`, such as:
+
+```gradle
+details.requested.group
+details.requested.name
+details.requested.version
+details.useVersion('...')
+details.because('...')
+```
+
+For example:
+
+```gradle
+details.useVersion('2.18.3')
+details.because('Use the approved Jackson version')
+```
+
+So the simple way to remember it is:
+
+```text
+details.requested
+    =
+the dependency declaration/request Gradle is currently resolving
+```
+
+### When is this useful?
+
+This is mainly an **advanced dependency resolution strategy**.
+
+For example, suppose:
+
+```text
+Library A
+    |
+    +-- jackson-databind:2.17.0
+
+Library B
+    |
+    +-- jackson-databind:2.18.2
+```
+
+You have a requirement:
+
+> Always use Jackson `2.18.3`.
+
+You can write:
+
+```gradle
+configurations.configureEach {
+    resolutionStrategy.eachDependency { details ->
+
+        if (details.requested.group == 'com.fasterxml.jackson.core' &&
+            details.requested.name == 'jackson-databind') {
+
+            details.useVersion('2.18.3')
+        }
+    }
+}
+```
+
+Conceptually:
+
+```text
+Requested                Used
+--------------------------------
+2.17.0      ───────────> 2.18.3
+2.18.2      ───────────> 2.18.3
+```
+
+Use `eachDependency` when you need **conditional/custom dependency resolution logic**.
+
+For a simple "always use this version" requirement, `force()` is simpler:
+
+```gradle
+configurations.configureEach {
+    resolutionStrategy {
+        force 'com.fasterxml.jackson.core:jackson-databind:2.18.3'
+    }
+}
+```
+
+For normal dependency management, prefer **BOMs, dependency constraints, and Spring Boot's dependency management** where appropriate.
+
+---
+
+## 9. Overall Dependency Management Flow
+
+The topics above can be viewed together as:
+
+```text
+Gradle Dependency Management
+│
+├── Transitive Dependencies
+│       └── Dependencies brought indirectly
+│
+├── Dependency Conflicts
+│       └── Multiple versions requested
+│
+├── BOM / Dependency Management
+│       └── Manage compatible versions
+│
+├── Dependency Insight
+│       └── Find why a version was selected
+│
+├── Dependency Exclusions
+│       └── Remove unwanted transitive dependencies
+│
+├── Dependency Constraints
+│       └── Constrain dependency versions
+│
+├── Dependency Locking
+│       └── Keep tested/resolved versions
+│
+├── api vs implementation
+│       └── Control library dependency exposure
+│
+└── Resolution Strategy
+        ├── failOnVersionConflict()
+        ├── force()
+        ├── eachDependency
+        │      ├── details.requested
+        │      └── details.useVersion()
+        └── Other resolution rules
+```

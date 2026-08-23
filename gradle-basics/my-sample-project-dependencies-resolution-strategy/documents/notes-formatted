@@ -1,0 +1,2974 @@
+# Gradle Project Structure, Wrapper, Build Configuration, Dependencies, JUnit, Spring Boot, and Dependency Management Strategies
+
+## 1. Basic Gradle Project Structure
+
+A typical Java Gradle project can have the following structure:
+
+```text
+my-project/
+│
+├── build.gradle
+├── settings.gradle
+├── gradlew
+├── gradlew.bat
+│
+├── gradle/
+│   └── wrapper/
+│       ├── gradle-wrapper.jar
+│       └── gradle-wrapper.properties
+│
+└── src/
+    ├── main/
+    │   ├── java/
+    │   │   └── com/
+    │   │       └── example/
+    │   │           └── Application.java
+    │   │
+    │   └── resources/
+    │       └── application.properties
+    │
+    └── test/
+        ├── java/
+        │   └── com/
+        │       └── example/
+        │           └── ApplicationTest.java
+        │
+        └── resources/
+```
+
+Important files:
+
+`build.gradle`
+
+Purpose: Build configuration, plugins, dependencies, tasks, etc.
+
+`settings.gradle`
+
+Purpose: Project name and multi-module project configuration.
+
+`gradlew`
+
+Purpose: Gradle Wrapper script for Linux/macOS.
+
+`gradlew.bat`
+
+Purpose: Gradle Wrapper script for Windows.
+
+`gradle/wrapper/gradle-wrapper.jar`
+
+Purpose: Implements Gradle Wrapper logic.
+
+`gradle/wrapper/gradle-wrapper.properties`
+
+Purpose: Specifies the Gradle version/distribution.
+
+`src/main/java`
+
+Purpose: Main Java source code.
+
+`src/main/resources`
+
+Purpose: Application resources/configuration.
+
+`src/test/java`
+
+Purpose: Test source code.
+
+`src/test/resources`
+
+Purpose: Test resources.
+
+# 2. Gradle Wrapper
+
+The Gradle Wrapper allows a project to use a specific Gradle version without requiring that exact version to be installed globally on the machine.
+
+The important files are:
+
+```text
+gradlew
+gradlew.bat
+gradle/
+└── wrapper/
+    ├── gradle-wrapper.jar
+    └── gradle-wrapper.properties
+```
+
+Why is the Wrapper useful?
+
+Suppose:
+
+```text
+Project requires Gradle 8.10
+Your machine has Gradle 7.6
+```
+
+If you run:
+
+```bash
+gradle build
+```
+
+the globally installed Gradle version is used and compatibility problems may occur.
+
+With the Wrapper:
+
+```bash
+gradlew build
+```
+
+the project uses the Gradle version configured by the project.
+
+Conceptually:
+
+```text
+gradlew build
+      │
+      ▼
+Reads Gradle Wrapper configuration
+      │
+      ▼
+Uses project's configured Gradle version
+      │
+      ▼
+Runs the build
+```
+
+This makes builds more consistent across developers and CI/CD environments.
+
+# 3. gradlew and gradlew.bat
+
+There are two Wrapper scripts:
+
+```text
+gradlew
+gradlew.bat
+```
+
+Linux/macOS:
+
+```bash
+./gradlew build
+```
+
+Windows:
+
+```bash
+gradlew.bat build
+```
+
+or commonly:
+
+```bash
+gradlew build
+```
+
+The scripts ultimately use:
+
+```text
+gradle-wrapper.jar
+```
+
+to start the appropriate Gradle version.
+
+# 4. gradle-wrapper.properties
+
+The file:
+
+```text
+gradle/wrapper/gradle-wrapper.properties
+```
+
+contains the configuration used by the Gradle Wrapper.
+
+Example:
+
+```properties
+distributionBase=GRADLE_USER_HOME
+distributionPath=wrapper/dists
+distributionUrl=https\://services.gradle.org/distributions/gradle-8.5-bin.zip
+zipStoreBase=GRADLE_USER_HOME
+zipStorePath=wrapper/dists
+```
+
+## 4.1 distributionBase
+
+```properties
+distributionBase=GRADLE_USER_HOME
+```
+
+`GRADLE_USER_HOME` represents the user's Gradle home directory.
+
+On Windows, it is typically:
+
+```text
+C:\Users\<username>\.gradle
+```
+
+Therefore, Gradle uses:
+
+```text
+C:\Users\<username>\.gradle
+```
+
+as the base location.
+
+## 4.2 distributionPath
+
+```properties
+distributionPath=wrapper/dists
+```
+
+This specifies where the downloaded Gradle distribution is stored inside `GRADLE_USER_HOME`.
+
+Conceptually:
+
+```text
+C:\Users\<username>\.gradle\
+└── wrapper\
+    └── dists\
+```
+
+## 4.3 distributionUrl
+
+```properties
+distributionUrl=https\://services.gradle.org/distributions/gradle-8.5-bin.zip
+```
+
+This is the most important property.
+
+It tells the Wrapper which Gradle distribution to use.
+
+In this example:
+
+```text
+Gradle version = 8.5
+Distribution = gradle-8.5-bin.zip
+```
+
+When you run:
+
+```bash
+gradlew build
+```
+
+the Wrapper checks whether the required Gradle distribution is already available.
+
+If it is not available, it downloads:
+
+```text
+gradle-8.5-bin.zip
+```
+
+and uses it to run the build.
+
+## 4.4 zipStoreBase
+
+```properties
+zipStoreBase=GRADLE_USER_HOME
+```
+
+This specifies the base directory where the downloaded Gradle ZIP is stored.
+
+Typically:
+
+```text
+C:\Users\<username>\.gradle
+```
+
+## 4.5 zipStorePath
+
+```properties
+zipStorePath=wrapper/dists
+```
+
+This specifies the path inside `GRADLE_USER_HOME`.
+
+Conceptually:
+
+```text
+C:\Users\<username>\.gradle\
+└── wrapper\
+    └── dists\
+```
+
+The Wrapper may create additional generated directories underneath this location.
+
+# 5. gradle-wrapper.jar
+
+The file:
+
+```text
+gradle/wrapper/gradle-wrapper.jar
+```
+
+is a small Java program that implements the Gradle Wrapper logic.
+
+Think of the process as:
+
+```text
+gradlew / gradlew.bat
+          │
+          ▼
+gradle-wrapper.jar
+          │
+          ▼
+reads gradle-wrapper.properties
+          │
+          ▼
+finds required Gradle version
+          │
+          ▼
+downloads Gradle if necessary
+          │
+          ▼
+runs Gradle
+          │
+          ▼
+builds the project
+```
+
+Why is the JAR required?
+
+Suppose the project specifies:
+
+```properties
+distributionUrl=https\://services.gradle.org/distributions/gradle-8.10-bin.zip
+```
+
+When you execute:
+
+```bash
+gradlew build
+```
+
+the Wrapper needs code to:
+
+1. Read `gradle-wrapper.properties`
+2. Determine the required Gradle version
+3. Download Gradle if necessary
+4. Start that Gradle version
+5. Execute the requested task
+
+That logic is contained in `gradle-wrapper.jar`.
+
+You normally do not modify this JAR manually.
+
+# 6. gradle-wrapper.jar vs gradle-wrapper.properties
+
+A simple way to remember the difference:
+
+```text
+gradle-wrapper.jar
+        ↓
+Does the Wrapper work
+
+gradle-wrapper.properties
+        ↓
+Tells the Wrapper which Gradle distribution to use
+```
+
+Think of it as:
+
+```text
+JAR          = HOW
+properties   = WHICH
+```
+
+The JAR contains the Wrapper implementation, while the properties file specifies the Gradle distribution configuration.
+
+# 7. settings.gradle
+
+A simple `settings.gradle` file:
+
+```gradle
+rootProject.name = 'my-project'
+```
+
+This tells Gradle:
+
+```text
+The name of my project is my-project.
+```
+
+`settings.gradle` is also important for multi-module projects because it can define which subprojects/modules belong to the build.
+
+# 8. Basic build.gradle
+
+A basic Java Gradle configuration can be:
+
+```gradle
+plugins {
+    id 'java'
+}
+
+group = 'com.example'
+version = '1.0.0'
+
+repositories {
+    mavenCentral()
+}
+
+dependencies {
+    implementation 'org.apache.commons:commons-lang3:3.18.0'
+
+    testImplementation 'org.junit.jupiter:junit-jupiter:5.12.2'
+}
+
+test {
+    useJUnitPlatform()
+}
+```
+
+# 9. Understanding the java Plugin
+
+```gradle
+plugins {
+    id 'java'
+}
+```
+
+This tells Gradle:
+
+```text
+This is a Java project.
+```
+
+The Java plugin provides tasks such as:
+
+```text
+compileJava
+compileTestJava
+test
+jar
+build
+clean
+```
+
+For example:
+
+```bash
+gradle build
+```
+
+can compile the application, compile tests, run tests, and create the JAR.
+
+# 10. group and version
+
+```gradle
+group = 'com.example'
+version = '1.0.0'
+```
+
+These identify the project.
+
+For example, when Gradle creates a JAR, you may get:
+
+```text
+build/libs/my-project-1.0.0.jar
+```
+
+The project name comes from:
+
+```gradle
+rootProject.name = 'my-project'
+```
+
+and the version comes from:
+
+```gradle
+version = '1.0.0'
+```
+
+# 11. repositories
+
+```gradle
+repositories {
+    mavenCentral()
+}
+```
+
+This tells Gradle where it should search for dependencies.
+
+For example:
+
+```gradle
+implementation 'org.apache.commons:commons-lang3:3.18.0'
+```
+
+Gradle searches the configured repositories for this library.
+
+In this example:
+
+```text
+build.gradle
+      │
+      ▼
+repositories
+      │
+      ▼
+Maven Central
+      │
+      ▼
+Find commons-lang3
+```
+
+# 12. Dependencies
+
+Dependencies tell Gradle which external libraries the project requires.
+
+Example:
+
+```gradle
+dependencies {
+    implementation 'org.apache.commons:commons-lang3:3.18.0'
+
+    testImplementation 'org.junit.jupiter:junit-jupiter:5.12.2'
+}
+```
+
+There are different dependency configurations.
+
+## 12.1 implementation
+
+```gradle
+implementation 'org.apache.commons:commons-lang3:3.18.0'
+```
+
+This dependency is required by the main application.
+
+For example:
+
+```java
+import org.apache.commons.lang3.StringUtils;
+```
+
+The `StringUtils` class comes from:
+
+```text
+commons-lang3
+```
+
+The flow is:
+
+```text
+build.gradle
+     │
+     ▼
+implementation dependency
+     │
+     ▼
+Gradle downloads commons-lang3
+     │
+     ▼
+Java compiler gets the library
+     │
+     ▼
+App.java can use StringUtils
+```
+
+## 12.2 testImplementation
+
+```gradle
+testImplementation 'org.junit.jupiter:junit-jupiter:5.12.2'
+```
+
+This dependency is intended for tests.
+
+The difference is:
+
+```text
+implementation
+      ↓
+Main application
+
+testImplementation
+      ↓
+Test code
+```
+
+For example:
+
+```java
+import org.junit.jupiter.api.Test;
+```
+
+comes from JUnit.
+
+# 13. Example Java Application
+
+Create:
+
+```text
+src/main/java/com/example/App.java
+```
+
+Example:
+
+```java
+package com.example;
+
+import org.apache.commons.lang3.StringUtils;
+
+public class App {
+
+    public static void main(String[] args) {
+
+        String name = "Gradle";
+
+        System.out.println(
+            StringUtils.isNotBlank(name)
+        );
+    }
+}
+```
+
+The important part is:
+
+```java
+import org.apache.commons.lang3.StringUtils;
+```
+
+This class is available because of:
+
+```gradle
+implementation 'org.apache.commons:commons-lang3:3.18.0'
+```
+
+# 14. Example Test
+
+Create:
+
+```text
+src/test/java/com/example/AppTest.java
+```
+
+Example:
+
+```java
+package com.example;
+
+import org.junit.jupiter.api.Test;
+
+import static org.junit.jupiter.api.Assertions.assertTrue;
+
+class AppTest {
+
+    @Test
+    void testName() {
+        assertTrue(true);
+    }
+}
+```
+
+JUnit comes from the test dependencies.
+
+# 15. useJUnitPlatform()
+
+In `build.gradle`:
+
+```gradle
+test {
+    useJUnitPlatform()
+}
+```
+
+This tells Gradle to use the JUnit Platform when discovering and executing tests.
+
+The JUnit Platform is used by JUnit 5 for test discovery and execution.
+
+# 16. Build the Project
+
+From the project directory:
+
+```bash
+gradle build
+```
+
+or, preferably when the Wrapper is available:
+
+```bash
+gradlew build
+```
+
+The process is approximately:
+
+```text
+gradlew build
+      │
+      ▼
+Read settings.gradle
+      │
+      ▼
+Read build.gradle
+      │
+      ▼
+Apply Java plugin
+      │
+      ▼
+Resolve dependencies
+      │
+      ▼
+Compile Java
+      │
+      ▼
+Compile tests
+      │
+      ▼
+Run tests
+      │
+      ▼
+Create JAR
+```
+
+After a successful build:
+
+```text
+my-project/
+└── build/
+    ├── classes/
+    ├── test-results/
+    ├── reports/
+    ├── libs/
+    │   └── my-project-1.0.0.jar
+    └── ...
+```
+
+# 17. Run Tests Separately
+
+You can run only the tests using:
+
+```bash
+gradlew test
+```
+
+Gradle then executes the test configuration:
+
+```gradle
+test {
+    useJUnitPlatform()
+}
+```
+
+and discovers and executes the JUnit tests.
+
+# 18. Complete Gradle Build Picture
+
+The overall relationship can be understood as:
+
+```text
+                         my-project
+                             │
+              ┌──────────────┴──────────────┐
+              ▼                             ▼
+        settings.gradle                build.gradle
+              │                             │
+              │                  ┌──────────┼───────────┐
+              │                  ▼          ▼           ▼
+              │               Plugins   Dependencies  Test config
+              │                  │          │           │
+              │                  ▼          ▼           ▼
+              │              Java plugin  Libraries  JUnit Platform
+              │                  │          │           │
+              └──────────────────┴──────────┴───────────┘
+                                         │
+                                         ▼
+                                   gradlew build
+                                         │
+                              ┌──────────┴──────────┐
+                              ▼                     ▼
+                         Tests pass             JAR created
+                                                    │
+                                                    ▼
+                                            build/libs/
+```
+
+# 19. Complete Example Project
+
+The complete project can look like this:
+
+```text
+my-project/
+│
+├── build.gradle
+├── settings.gradle
+├── gradlew
+├── gradlew.bat
+│
+├── gradle/
+│   └── wrapper/
+│       ├── gradle-wrapper.jar
+│       └── gradle-wrapper.properties
+│
+└── src/
+    ├── main/
+    │   ├── java/
+    │   │   └── com/
+    │   │       └── example/
+    │   │           └── App.java
+    │   │
+    │   └── resources/
+    │
+    └── test/
+        ├── java/
+        │   └── com/
+        │       └── example/
+        │           └── AppTest.java
+        │
+        └── resources/
+```
+
+# 20. JUnit Dependency Management with BOM
+
+A more flexible JUnit configuration is:
+
+```gradle
+dependencies {
+
+    testImplementation platform('org.junit:junit-bom:5.12.2')
+
+    testImplementation 'org.junit.jupiter:junit-jupiter'
+
+    testRuntimeOnly 'org.junit.platform:junit-platform-launcher'
+
+    implementation 'org.apache.commons:commons-lang3:3.18.0'
+}
+```
+
+This configuration can work because the JUnit BOM manages compatible versions of the JUnit modules.
+
+What is the BOM?
+
+BOM means:
+
+```text
+Bill of Materials
+```
+
+The JUnit BOM:
+
+```gradle
+testImplementation platform('org.junit:junit-bom:5.12.2')
+```
+
+provides version information for related JUnit dependencies.
+
+Therefore, you can write:
+
+```gradle
+testImplementation 'org.junit.jupiter:junit-jupiter'
+```
+
+without explicitly specifying its version.
+
+The version is obtained from the BOM.
+
+# 21. Why junit-platform-launcher Is Added
+
+This dependency:
+
+```gradle
+testRuntimeOnly 'org.junit.platform:junit-platform-launcher'
+```
+
+provides the JUnit Platform Launcher at test runtime.
+
+The important distinction is:
+
+```text
+testImplementation
+        ↓
+Required to compile test code
+
+testRuntimeOnly
+        ↓
+Required when tests are executed
+```
+
+So:
+
+```gradle
+testImplementation 'org.junit.jupiter:junit-jupiter'
+```
+
+is used for compiling the test code, while:
+
+```gradle
+testRuntimeOnly 'org.junit.platform:junit-platform-launcher'
+```
+
+makes the launcher available at test runtime.
+
+# 22. Attempt to Force JUnit Platform Version
+
+Another approach is:
+
+```gradle
+configurations.all {
+    resolutionStrategy.eachDependency { dependency ->
+        if (dependency.requested.group == 'org.junit.platform') {
+            dependency.useVersion '1.12.2'
+        }
+    }
+}
+```
+
+This approach is different from using a BOM.
+
+It tells Gradle:
+
+For dependencies whose group is:
+
+```text
+org.junit.platform
+```
+
+force the requested version to:
+
+```text
+1.12.2
+```
+
+Conceptually:
+
+```text
+Dependency resolution
+        │
+        ▼
+Check each dependency
+        │
+        ▼
+Is group == org.junit.platform?
+        │
+       Yes
+        │
+        ▼
+Use version 1.12.2
+```
+
+However, this is not equivalent to the JUnit BOM.
+
+The BOM manages a coordinated set of JUnit versions, while `resolutionStrategy` modifies dependency resolution based on a rule.
+
+Therefore, if the BOM-based configuration works while the `resolutionStrategy` configuration does not, the BOM approach is generally preferable for managing JUnit's related module versions.
+
+# 23. BOM vs resolutionStrategy
+
+BOM approach:
+
+```gradle
+dependencies {
+    testImplementation platform('org.junit:junit-bom:5.12.2')
+
+    testImplementation 'org.junit.jupiter:junit-jupiter'
+
+    testRuntimeOnly 'org.junit.platform:junit-platform-launcher'
+}
+```
+
+Conceptually:
+
+```text
+JUnit BOM
+   │
+   ├── JUnit Jupiter
+   ├── JUnit Platform
+   └── Other compatible JUnit modules
+```
+
+The BOM is designed to keep related JUnit components compatible.
+
+Resolution strategy approach:
+
+```gradle
+configurations.all {
+    resolutionStrategy.eachDependency { dependency ->
+        if (dependency.requested.group == 'org.junit.platform') {
+            dependency.useVersion '1.12.2'
+        }
+    }
+}
+```
+
+This is a general Gradle dependency-resolution mechanism.
+
+It does not provide the same coordinated dependency management that the JUnit BOM provides.
+
+# 24. Recommended JUnit Configuration
+
+For the example project, a clean configuration is:
+
+```gradle
+plugins {
+    id 'java'
+}
+
+group = 'com.example'
+version = '1.0.0'
+
+repositories {
+    mavenCentral()
+}
+
+dependencies {
+
+    implementation 'org.apache.commons:commons-lang3:3.18.0'
+
+    testImplementation platform('org.junit:junit-bom:5.12.2')
+    testImplementation 'org.junit.jupiter:junit-jupiter'
+
+    testRuntimeOnly 'org.junit.platform:junit-platform-launcher'
+}
+
+test {
+    useJUnitPlatform()
+}
+```
+
+The main concepts are:
+
+```text
+Gradle Wrapper
+    ↓
+Controls Gradle version
+
+settings.gradle
+    ↓
+Defines project structure/name
+
+build.gradle
+    ↓
+Defines how the project is built
+
+plugins
+    ↓
+Adds Gradle capabilities
+
+repositories
+    ↓
+Defines where dependencies are found
+
+dependencies
+    ↓
+Defines libraries required by the project
+
+BOM
+    ↓
+Manages compatible dependency versions
+
+testImplementation
+    ↓
+Dependencies required to compile tests
+
+testRuntimeOnly
+    ↓
+Dependencies required when tests execute
+
+useJUnitPlatform()
+    ↓
+Uses JUnit Platform for test execution
+
+gradlew build
+    ↓
+Compiles + tests + packages the application
+```
+
+# 25. Gradle Dependency Configurations
+
+## 25.1 implementation
+
+Dependency required by your application:
+
+```gradle
+dependencies {
+    implementation 'org.apache.commons:commons-lang3:3.18.0'
+}
+```
+
+Used by:
+
+```text
+src/main/java
+```
+
+Example:
+
+```text
+StringUtils.isBlank(name);
+```
+
+## 25.2 testImplementation
+
+Dependency required only for tests:
+
+```gradle
+testImplementation 'org.junit.jupiter:junit-jupiter:5.12.2'
+```
+
+Available to:
+
+```text
+src/test/java
+```
+
+but not your main application.
+
+## 25.3 runtimeOnly
+
+Required when the application runs, but not needed to compile your Java source.
+
+Example with PostgreSQL:
+
+```gradle
+dependencies {
+    implementation 'org.springframework.boot:spring-boot-starter-jdbc'
+    runtimeOnly 'org.postgresql:postgresql'
+}
+```
+
+Conceptually:
+
+```text
+Compile:
+    JDBC API
+    PostgreSQL driver is not needed directly by the application code
+
+Runtime:
+    JDBC API
+    PostgreSQL driver
+```
+
+This is very common for database drivers.
+
+## 25.4 testRuntimeOnly
+
+Required only when tests run.
+
+Example:
+
+```gradle
+testRuntimeOnly 'org.junit.platform:junit-platform-launcher'
+```
+
+Compile tests:
+
+```text
+JUnit API
+```
+
+Run tests:
+
+```text
+JUnit API
+JUnit Engine
+JUnit Launcher
+```
+
+## 25.5 compileOnly
+
+Needed to compile your code but should not be included at runtime.
+
+Example:
+
+```gradle
+compileOnly 'org.projectlombok:lombok:1.18.38'
+```
+
+Common example:
+
+```text
+Lombok
+   ↓
+needed during compilation
+   ↓
+not needed in application runtime
+```
+
+## 25.6 annotationProcessor
+
+For annotation processors such as Lombok:
+
+```gradle
+dependencies {
+    compileOnly 'org.projectlombok:lombok:1.18.38'
+    annotationProcessor 'org.projectlombok:lombok:1.18.38'
+}
+```
+
+The annotation processor generates/modifies code during compilation.
+
+## 25.7 testCompileOnly
+
+Similar to `compileOnly`, but only for test compilation:
+
+```gradle
+testCompileOnly 'some:test-library:1.0'
+```
+
+Not needed very often in basic projects.
+
+## 25.8 testAnnotationProcessor
+
+Annotation processor used only for tests:
+
+```gradle
+testAnnotationProcessor 'some:test-processor:1.0'
+```
+
+Again, less commonly needed.
+
+# 26. Most Important Dependency Configurations
+
+For normal Java/Spring projects, remember these first:
+
+```text
+Configuration             Purpose
+
+implementation             Application compile + runtime
+
+runtimeOnly                Application runtime only
+
+compileOnly                Compile only
+
+annotationProcessor        Compile-time code generation
+
+testImplementation         Test compile + test runtime
+
+testRuntimeOnly            Test runtime only
+
+testCompileOnly            Test compile only
+
+testAnnotationProcessor    Test annotation processing
+```
+
+# 27. A Practical Example
+
+```gradle
+dependencies {
+
+    // Application
+    implementation 'org.apache.commons:commons-lang3:3.18.0'
+
+    // Database driver
+    runtimeOnly 'org.postgresql:postgresql:42.7.7'
+
+    // Compile-time
+    compileOnly 'org.projectlombok:lombok:1.18.38'
+    annotationProcessor 'org.projectlombok:lombok:1.18.38'
+
+    // Tests
+    testImplementation platform('org.junit:junit-bom:5.12.2')
+    testImplementation 'org.junit.jupiter:junit-jupiter'
+
+    // Test runtime
+    testRuntimeOnly 'org.junit.platform:junit-platform-launcher'
+}
+```
+
+# 28. Dependency Scopes
+
+Think of it as:
+
+```text
+                     Dependency
+                         │
+          ┌──────────────┼──────────────┐
+          ↓              ↓              ↓
+       Compile         Runtime         Test
+          │              │              │
+ implementation     runtimeOnly   testImplementation
+ compileOnly                       testRuntimeOnly
+ annotationProcessor
+```
+
+# 29. Important Next Gradle Dependency Topics
+
+Transitive dependencies
+
+Dependency brings other dependencies.
+
+Dependency conflicts
+
+Two libraries require different versions.
+
+BOM / dependency management
+
+Keeps related libraries on compatible versions.
+
+dependencyInsight
+
+Shows why Gradle selected a particular version.
+
+Excluding dependencies
+
+Exclude a specific group/module.
+
+Dependency locking
+
+Ensures reproducible dependency versions.
+
+api vs implementation
+
+Especially important when building Java libraries.
+
+For current learning, the most useful topics are:
+
+```text
+Transitive dependencies
+Version conflicts
+BOM
+dependencyInsight
+Excluding dependencies
+Dependency locking
+api vs implementation
+```
+
+# 30. Maven vs Gradle Dependency Management
+
+In Maven, Spring Boot commonly has:
+
+```xml
+<parent>
+    <groupId>org.springframework.boot</groupId>
+    <artifactId>spring-boot-starter-parent</artifactId>
+    <version>3.4.2</version>
+</parent>
+```
+
+The parent provides things such as:
+
+```text
+Dependency versions
+Plugin versions/configuration
+Default Maven configuration
+```
+
+Gradle does not use inheritance through a `<parent>` POM.
+
+Instead, these responsibilities are split among plugins and dependency management.
+
+For Spring Boot:
+
+```gradle
+plugins {
+    id 'java'
+    id 'org.springframework.boot' version '3.4.2'
+}
+```
+
+The Spring Boot plugin gives you Spring Boot build functionality and dependency management support.
+
+Then:
+
+```gradle
+dependencies {
+    implementation 'org.springframework.boot:spring-boot-starter-jdbc'
+    runtimeOnly 'org.postgresql:postgresql'
+}
+```
+
+You don't need to specify the versions because Spring Boot manages compatible dependency versions.
+
+# 31. Maven vs Gradle
+
+MAVEN
+
+```xml
+<parent>
+    spring-boot-starter-parent
+        ↓
+    dependency versions
+    plugin configuration
+    defaults
+</parent>
+```
+
+GRADLE
+
+```gradle
+plugins {
+    id 'org.springframework.boot' version '3.4.2'
+}
+```
+
+```text
+        ↓
+Spring Boot Gradle plugin
+        ↓
+Spring Boot dependency management
+        ↓
+implementation / runtimeOnly dependencies
+```
+
+So if you're asking:
+
+```text
+Where do I specify the equivalent of Spring Boot's parent version?
+```
+
+In Gradle, normally here:
+
+```gradle
+id 'org.springframework.boot' version '3.4.2'
+```
+
+There is no separate parent block like Maven.
+
+# 32. Spring Boot JDBC and PostgreSQL
+
+Spring Boot JDBC:
+
+```gradle
+implementation 'org.springframework.boot:spring-boot-starter-jdbc'
+```
+
+PostgreSQL driver:
+
+```gradle
+runtimeOnly 'org.postgresql:postgresql'
+```
+
+Does starter-jdbc contain PostgreSQL?
+
+No.
+
+`spring-boot-starter-jdbc` does not contain the PostgreSQL JDBC driver.
+
+These are two different things:
+
+```gradle
+implementation 'org.springframework.boot:spring-boot-starter-jdbc'
+runtimeOnly 'org.postgresql:postgresql'
+```
+
+# 33. What spring-boot-starter-jdbc Contains
+
+Conceptually:
+
+```text
+spring-boot-starter-jdbc
+        │
+        ├── Spring JDBC
+        ├── Spring TX
+        ├── HikariCP
+        └── Spring Boot JDBC support
+```
+
+It provides the framework support for connecting to databases, but it does not know which database you are using.
+
+# 34. PostgreSQL Driver
+
+You separately add:
+
+```gradle
+runtimeOnly 'org.postgresql:postgresql'
+```
+
+This provides the actual PostgreSQL JDBC driver.
+
+The flow is:
+
+```text
+Your application
+       │
+       ▼
+Spring JDBC
+       │
+       ▼
+JDBC API
+       │
+       ▼
+PostgreSQL JDBC Driver
+       │
+       ▼
+PostgreSQL Database
+```
+
+# 35. Why runtimeOnly for the Database Driver?
+
+Your Java code generally uses JDBC/Spring JDBC APIs:
+
+```java
+JdbcTemplate jdbcTemplate;
+```
+
+It doesn't directly need PostgreSQL-specific classes to compile.
+
+The PostgreSQL driver is needed when the application actually connects to PostgreSQL.
+
+Therefore:
+
+```gradle
+implementation 'org.springframework.boot:spring-boot-starter-jdbc'
+runtimeOnly 'org.postgresql:postgresql'
+```
+
+is the normal setup.
+
+# 36. Compare H2 and PostgreSQL
+
+If you use H2:
+
+```gradle
+implementation 'org.springframework.boot:spring-boot-starter-jdbc'
+runtimeOnly 'com.h2database:h2'
+```
+
+For PostgreSQL:
+
+```gradle
+implementation 'org.springframework.boot:spring-boot-starter-jdbc'
+runtimeOnly 'org.postgresql:postgresql'
+```
+
+For MySQL:
+
+```gradle
+implementation 'org.springframework.boot:spring-boot-starter-jdbc'
+runtimeOnly 'com.mysql:mysql-connector-j'
+```
+
+The JDBC starter is database-independent; the database driver is selected separately.
+
+# 37. Spring JDBC with H2
+
+With these dependencies:
+
+```gradle
+dependencies {
+    implementation 'org.springframework.boot:spring-boot-starter-jdbc'
+    runtimeOnly 'com.h2database:h2'
+
+    testImplementation 'org.springframework.boot:spring-boot-starter-test'
+}
+```
+
+## 37.1 application.properties
+
+```properties
+spring.datasource.url=jdbc:h2:mem:testdb
+spring.datasource.username=sa
+spring.datasource.password=
+spring.datasource.driver-class-name=org.h2.Driver
+
+spring.h2.console.enabled=true
+```
+
+Here:
+
+```text
+Spring Boot
+    ↓
+spring-boot-starter-jdbc
+    ↓
+JdbcTemplate
+    ↓
+JDBC
+    ↓
+H2 JDBC Driver
+    ↓
+H2 Database
+```
+
+# 38. Create a Table
+
+You can create:
+
+```text
+src/main/resources/schema.sql
+```
+
+```sql
+CREATE TABLE employee (
+    id INT PRIMARY KEY,
+    name VARCHAR(100),
+    salary DECIMAL(10,2)
+);
+```
+
+Spring Boot can automatically execute `schema.sql` when the application starts.
+
+# 39. Write Java JDBC Code
+
+For example:
+
+```java
+package com.example.demo;
+
+import org.springframework.jdbc.core.JdbcTemplate;
+import org.springframework.stereotype.Repository;
+
+@Repository
+public class EmployeeRepository {
+
+    private final JdbcTemplate jdbcTemplate;
+
+    public EmployeeRepository(JdbcTemplate jdbcTemplate) {
+        this.jdbcTemplate = jdbcTemplate;
+    }
+
+    public void saveEmployee(int id, String name, double salary) {
+        String sql = "INSERT INTO employee (id, name, salary) VALUES (?, ?, ?)";
+
+        jdbcTemplate.update(sql, id, name, salary);
+    }
+}
+```
+
+Reading data:
+
+```java
+public List<Employee> findAll() {
+
+    String sql = "SELECT id, name, salary FROM employee";
+
+    return jdbcTemplate.query(
+        sql,
+        (rs, rowNum) -> new Employee(
+            rs.getInt("id"),
+            rs.getString("name"),
+            rs.getDouble("salary")
+        )
+    );
+}
+```
+
+# 40. Important Distinction
+
+`spring-boot-starter-jdbc` gives you the tools to write JDBC-based code:
+
+```text
+JdbcTemplate
+DataSource
+Spring JDBC
+Transaction support
+HikariCP
+```
+
+while:
+
+```gradle
+runtimeOnly 'com.h2database:h2'
+```
+
+gives you the H2 database/driver implementation.
+
+So this combination is enough to build a complete Spring JDBC application using H2.
+
+If later you switch to PostgreSQL, your repository code can remain essentially the same.
+
+You mainly replace:
+
+```gradle
+runtimeOnly 'com.h2database:h2'
+```
+
+with:
+
+```gradle
+runtimeOnly 'org.postgresql:postgresql'
+```
+
+and change the datasource configuration.
+
+# 41. Spring Boot Test vs Plain JUnit
+
+`spring-boot-starter-test` already brings the required JUnit test engine and runtime dependencies transitively.
+
+The difference is mainly about what each dependency provides.
+
+## Plain JUnit Setup
+
+When you write:
+
+```gradle
+testImplementation platform('org.junit:junit-bom:5.12.2')
+testImplementation 'org.junit.jupiter:junit-jupiter'
+testRuntimeOnly 'org.junit.platform:junit-platform-launcher'
+```
+
+`junit-jupiter` is primarily the JUnit Jupiter API/engine aggregation, while the JUnit Platform Launcher is used by the test execution infrastructure to discover and launch tests.
+
+Therefore, you commonly see:
+
+```gradle
+testRuntimeOnly 'org.junit.platform:junit-platform-launcher'
+```
+
+# 42. Spring Boot Test Setup
+
+When you write:
+
+```gradle
+testImplementation 'org.springframework.boot:spring-boot-starter-test'
+```
+
+the starter is an umbrella dependency.
+
+It brings Spring's testing support plus JUnit Jupiter and other common testing libraries.
+
+Conceptually:
+
+```text
+spring-boot-starter-test
+        |
+        +-- JUnit Jupiter
+        |
+        +-- JUnit Platform
+        |
+        +-- Spring Test
+        |
+        +-- AssertJ
+        |
+        +-- Mockito
+        |
+        +-- JSONassert
+        |
+        +-- JsonPath
+        |
+        +-- etc.
+```
+
+So you don't normally need to add:
+
+```gradle
+testRuntimeOnly 'org.junit.platform:junit-platform-launcher'
+```
+
+just to make Spring Boot tests work.
+
+# 43. Explicit JUnit Platform Launcher with Spring Boot
+
+You can explicitly add the launcher:
+
+```gradle
+testImplementation 'org.springframework.boot:spring-boot-starter-test'
+testRuntimeOnly 'org.junit.platform:junit-platform-launcher'
+```
+
+This isn't inherently wrong.
+
+The important thing is that you don't specify a conflicting version.
+
+Avoid manually forcing a potentially incompatible version:
+
+```gradle
+testRuntimeOnly 'org.junit.platform:junit-platform-launcher:1.12.2'
+```
+
+Instead, if you want it explicitly:
+
+```gradle
+testRuntimeOnly 'org.junit.platform:junit-platform-launcher'
+```
+
+and let Spring Boot's dependency management determine the compatible version.
+
+# 44. Recommended Spring Boot 3.4.2 Test Configuration
+
+For a Spring Boot 3.4.2 project:
+
+```gradle
+dependencies {
+    implementation 'org.springframework.boot:spring-boot-starter-jdbc'
+    runtimeOnly 'com.h2database:h2'
+
+    testImplementation 'org.springframework.boot:spring-boot-starter-test'
+    testRuntimeOnly 'org.junit.platform:junit-platform-launcher'
+}
+
+test {
+    useJUnitPlatform()
+}
+```
+
+# 45. Simplest Spring Boot Test Configuration
+
+If you want the simplest configuration:
+
+```gradle
+dependencies {
+    testImplementation 'org.springframework.boot:spring-boot-starter-test'
+}
+
+test {
+    useJUnitPlatform()
+}
+```
+
+# 46. Important JUnit Version Rule
+
+Do not manually add:
+
+```gradle
+testRuntimeOnly 'org.junit.platform:junit-platform-launcher:1.12.2'
+```
+
+when other JUnit Platform components are managed at another version, such as `1.11.4`.
+
+Mixing incompatible JUnit Platform versions can cause test execution errors.
+
+For Spring Boot, prefer:
+
+```gradle
+testRuntimeOnly 'org.junit.platform:junit-platform-launcher'
+```
+
+and allow Spring Boot's dependency management to select the compatible version.
+
+For plain JUnit, use the JUnit BOM to manage compatible JUnit versions:
+
+```gradle
+testImplementation platform('org.junit:junit-bom:5.12.2')
+testImplementation 'org.junit.jupiter:junit-jupiter'
+testRuntimeOnly 'org.junit.platform:junit-platform-launcher'
+
+test {
+    useJUnitPlatform()
+}
+```
+
+# 47. Final Dependency Configuration Examples
+
+Plain Java + JUnit:
+
+```gradle
+dependencies {
+    implementation 'org.apache.commons:commons-lang3:3.18.0'
+
+    testImplementation platform('org.junit:junit-bom:5.12.2')
+    testImplementation 'org.junit.jupiter:junit-jupiter'
+    testRuntimeOnly 'org.junit.platform:junit-platform-launcher'
+}
+
+test {
+    useJUnitPlatform()
+}
+```
+
+Spring Boot + JDBC + H2 + Tests:
+
+```gradle
+plugins {
+    id 'java'
+    id 'org.springframework.boot' version '3.4.2'
+}
+
+dependencies {
+    implementation 'org.springframework.boot:spring-boot-starter-jdbc'
+    runtimeOnly 'com.h2database:h2'
+
+    testImplementation 'org.springframework.boot:spring-boot-starter-test'
+    testRuntimeOnly 'org.junit.platform:junit-platform-launcher'
+}
+
+test {
+    useJUnitPlatform()
+}
+```
+
+Spring Boot + JDBC + PostgreSQL + Tests:
+
+```gradle
+plugins {
+    id 'java'
+    id 'org.springframework.boot' version '3.4.2'
+}
+
+dependencies {
+    implementation 'org.springframework.boot:spring-boot-starter-jdbc'
+    runtimeOnly 'org.postgresql:postgresql'
+
+    testImplementation 'org.springframework.boot:spring-boot-starter-test'
+    testRuntimeOnly 'org.junit.platform:junit-platform-launcher'
+}
+
+test {
+    useJUnitPlatform()
+}
+```
+
+# 48. Spring Boot Dependencies and Starters
+
+Spring Boot provides many starters that can be added depending on what the application does.
+
+For example:
+
+```gradle
+dependencies {
+
+    // Web / REST API
+    implementation 'org.springframework.boot:spring-boot-starter-web'
+
+    // JDBC
+    implementation 'org.springframework.boot:spring-boot-starter-jdbc'
+
+    // JPA / Hibernate
+    implementation 'org.springframework.boot:spring-boot-starter-data-jpa'
+
+    // Validation
+    implementation 'org.springframework.boot:spring-boot-starter-validation'
+
+    // Security
+    implementation 'org.springframework.boot:spring-boot-starter-security'
+
+    // Actuator / monitoring
+    implementation 'org.springframework.boot:spring-boot-starter-actuator'
+
+    // Thymeleaf UI
+    implementation 'org.springframework.boot:spring-boot-starter-thymeleaf'
+
+    // WebFlux / reactive applications
+    implementation 'org.springframework.boot:spring-boot-starter-webflux'
+
+    // Kafka
+    implementation 'org.springframework.kafka:spring-kafka'
+
+    // Redis
+    implementation 'org.springframework.boot:spring-boot-starter-data-redis'
+
+    // MongoDB
+    implementation 'org.springframework.boot:spring-boot-starter-data-mongodb'
+
+    // PostgreSQL database driver
+    runtimeOnly 'org.postgresql:postgresql'
+
+    // H2 database driver
+    runtimeOnly 'com.h2database:h2'
+
+    // Testing
+    testImplementation 'org.springframework.boot:spring-boot-starter-test'
+}
+```
+
+# 49. Main Spring Boot Starters
+
+| Dependency                       | Purpose                                |
+| -------------------------------- | -------------------------------------- |
+| spring-boot-starter-web          | REST APIs, Spring MVC, embedded Tomcat |
+| spring-boot-starter-jdbc         | JDBC, JdbcTemplate, connection pooling |
+| spring-boot-starter-data-jpa     | JPA + Hibernate                        |
+| spring-boot-starter-validation   | @Valid, @NotNull, @Size, etc.          |
+| spring-boot-starter-security     | Authentication and authorization       |
+| spring-boot-starter-actuator     | Health, metrics, monitoring endpoints  |
+| spring-boot-starter-webflux      | Reactive/non-blocking web applications |
+| spring-boot-starter-thymeleaf    | Server-side HTML                       |
+| spring-boot-starter-data-redis   | Redis                                  |
+| spring-boot-starter-data-mongodb | MongoDB                                |
+| spring-boot-starter-cache        | Spring caching abstraction             |
+| spring-boot-starter-mail         | Email                                  |
+| spring-boot-starter-amqp         | RabbitMQ                               |
+| spring-boot-starter-batch        | Batch processing                       |
+| spring-boot-starter-quartz       | Quartz scheduling                      |
+
+# 50. Typical REST + Database Application
+
+A very common Spring Boot application might use:
+
+```gradle
+dependencies {
+
+    // REST API
+    implementation 'org.springframework.boot:spring-boot-starter-web'
+
+    // Database access
+    implementation 'org.springframework.boot:spring-boot-starter-jdbc'
+
+    // Input validation
+    implementation 'org.springframework.boot:spring-boot-starter-validation'
+
+    // Security
+    implementation 'org.springframework.boot:spring-boot-starter-security'
+
+    // Monitoring
+    implementation 'org.springframework.boot:spring-boot-starter-actuator'
+
+    // Database
+    runtimeOnly 'org.postgresql:postgresql'
+
+    // Tests
+    testImplementation 'org.springframework.boot:spring-boot-starter-test'
+}
+```
+
+The flow is:
+
+```text
+                    Spring Boot Application
+                              │
+          ┌───────────────────┼────────────────────┐
+          ▼                   ▼                    ▼
+     REST / Web          Database Access       Security
+          │                   │                    │
+ starter-web           starter-jdbc       starter-security
+          │                   │
+          ▼                   ▼
+    Spring MVC           JdbcTemplate
+          │                   │
+          │                   ▼
+          │             JDBC Driver
+          │                   │
+          │                   ▼
+          │              PostgreSQL
+          │
+          ▼
+      REST API
+```
+
+# 51. Choosing Spring Boot Starters
+
+Choose the starter based on the feature your application requires.
+
+REST API:
+
+```gradle
+implementation 'org.springframework.boot:spring-boot-starter-web'
+```
+
+JDBC:
+
+```gradle
+implementation 'org.springframework.boot:spring-boot-starter-jdbc'
+```
+
+JPA/Hibernate:
+
+```gradle
+implementation 'org.springframework.boot:spring-boot-starter-data-jpa'
+```
+
+Validation:
+
+```gradle
+implementation 'org.springframework.boot:spring-boot-starter-validation'
+```
+
+Security:
+
+```gradle
+implementation 'org.springframework.boot:spring-boot-starter-security'
+```
+
+Monitoring:
+
+```gradle
+implementation 'org.springframework.boot:spring-boot-starter-actuator'
+```
+
+Reactive REST API:
+
+```gradle
+implementation 'org.springframework.boot:spring-boot-starter-webflux'
+```
+
+Redis:
+
+```gradle
+implementation 'org.springframework.boot:spring-boot-starter-data-redis'
+```
+
+MongoDB:
+
+```gradle
+implementation 'org.springframework.boot:spring-boot-starter-data-mongodb'
+```
+
+RabbitMQ:
+
+```gradle
+implementation 'org.springframework.boot:spring-boot-starter-amqp'
+```
+
+Caching:
+
+```gradle
+implementation 'org.springframework.boot:spring-boot-starter-cache'
+```
+
+Batch:
+
+```gradle
+implementation 'org.springframework.boot:spring-boot-starter-batch'
+```
+
+Quartz:
+
+```gradle
+implementation 'org.springframework.boot:spring-boot-starter-quartz'
+```
+
+# 52. Important: Do Not Add Every Starter
+
+You normally should not add every Spring Boot starter to every project.
+
+Add a starter when your application actually needs that capability.
+
+For example, if your application is:
+
+```text
+REST API + PostgreSQL + validation + security
+```
+
+then:
+
+```gradle
+dependencies {
+
+    implementation 'org.springframework.boot:spring-boot-starter-web'
+
+    implementation 'org.springframework.boot:spring-boot-starter-jdbc'
+
+    implementation 'org.springframework.boot:spring-boot-starter-validation'
+
+    implementation 'org.springframework.boot:spring-boot-starter-security'
+
+    runtimeOnly 'org.postgresql:postgresql'
+
+    testImplementation 'org.springframework.boot:spring-boot-starter-test'
+}
+```
+
+If the application does not use MongoDB, there is no reason to add:
+
+```gradle
+implementation 'org.springframework.boot:spring-boot-starter-data-mongodb'
+```
+
+Likewise, add Redis, Kafka, RabbitMQ, WebFlux, Actuator, etc. only when those capabilities are required.
+
+# 53. Overall Mental Model
+
+```text
+Gradle Wrapper
+    ↓
+Controls Gradle version
+
+settings.gradle
+    ↓
+Defines project name and project structure
+
+build.gradle
+    ↓
+Defines how the project is built
+
+plugins
+    ↓
+Adds Gradle capabilities
+
+repositories
+    ↓
+Defines where dependencies are found
+
+dependencies
+    ↓
+Defines libraries required by the project
+
+Spring Boot starter
+    ↓
+Provides a group of related Spring dependencies
+
+implementation
+    ↓
+Main application dependency
+
+runtimeOnly
+    ↓
+Main application runtime dependency
+
+compileOnly
+    ↓
+Compile-time only dependency
+
+annotationProcessor
+    ↓
+Compile-time code generation
+
+testImplementation
+    ↓
+Test dependency
+
+testRuntimeOnly
+    ↓
+Test runtime dependency
+
+BOM
+    ↓
+Manages compatible dependency versions
+
+useJUnitPlatform()
+    ↓
+Uses JUnit Platform for test execution
+
+gradlew build
+    ↓
+Compiles
+    ↓
+Runs tests
+    ↓
+Packages the application
+    ↓
+Creates JAR
+```
+
+# 54. Gradle Dependency Management Strategies
+
+## 1. Transitive Dependencies
+
+A transitive dependency is a dependency that is brought into your project indirectly by another dependency.
+
+For example:
+
+```text
+spring-boot-starter-web
+        |
+        +-- spring-web
+        +-- spring-webmvc
+        +-- jackson
+        +-- tomcat
+        +-- ...
+```
+
+You directly declare:
+
+```gradle
+implementation 'org.springframework.boot:spring-boot-starter-web'
+```
+
+But Spring Boot's web starter brings several other libraries automatically.
+
+Therefore, you normally do not need to declare every transitive dependency manually.
+
+---
+
+## 2. Dependency Conflicts
+
+A dependency conflict occurs when two or more libraries require different versions of the same dependency.
+
+For example:
+
+```text
+Library A
+    |
+    +-- checker-qual:3.48.3
+
+Library B
+    |
+    +-- checker-qual:3.43.0
+```
+
+Your project receives:
+
+```text
+checker-qual:3.48.3
+checker-qual:3.43.0
+```
+
+Gradle must resolve the conflict.
+
+By default, Gradle normally selects the highest version:
+
+```text
+3.48.3
+3.43.0
+   |
+   v
+3.48.3 selected
+```
+
+To investigate the conflict:
+
+```bash
+gradlew.bat dependencyInsight --dependency checker-qual --configuration compileClasspath
+```
+
+This helps identify which dependencies are requesting each version.
+
+### failOnVersionConflict()
+
+You can make Gradle fail whenever multiple versions are requested:
+
+```gradle
+configurations.configureEach {
+    resolutionStrategy {
+        failOnVersionConflict()
+    }
+}
+```
+
+For example:
+
+```text
+checker-qual:3.48.3
+checker-qual:3.43.0
+        |
+        v
+failOnVersionConflict()
+        |
+        v
+BUILD FAILED
+```
+
+This is useful when you want to investigate dependency conflicts instead of allowing Gradle to resolve them automatically.
+
+### force()
+
+You can explicitly force a particular version:
+
+```gradle
+configurations.configureEach {
+    resolutionStrategy {
+        force 'org.checkerframework:checker-qual:3.48.3'
+    }
+}
+```
+
+Then:
+
+```text
+checker-qual:3.48.3
+checker-qual:3.43.0
+        |
+        v
+force 3.48.3
+        |
+        v
+checker-qual:3.48.3
+```
+
+For a learning example where the objective is to resolve this specific conflict, use:
+
+```gradle
+configurations.configureEach {
+    resolutionStrategy {
+        force 'org.checkerframework:checker-qual:3.48.3'
+    }
+}
+```
+
+---
+
+## 3. BOM / Dependency Management
+
+BOM stands for Bill of Materials.
+
+A BOM defines compatible versions of a group of related libraries.
+
+Spring Boot provides dependency management for many commonly used libraries.
+
+Because Spring Boot manages the versions, you can write:
+
+```gradle
+implementation 'org.springframework.boot:spring-boot-starter-web'
+implementation 'org.springframework.boot:spring-boot-starter-jdbc'
+implementation 'org.springframework.kafka:spring-kafka'
+```
+
+without specifying versions.
+
+Conceptually:
+
+```text
+Spring Boot 3.4.2
+       |
+       v
+Dependency Management / BOM
+       |
+       +-- Spring Framework version
+       +-- Jackson version
+       +-- Hibernate version
+       +-- Tomcat version
+       +-- Kafka-related versions
+       +-- Other compatible versions
+```
+
+This prevents you from manually maintaining many related dependency versions.
+
+Your plugins:
+
+```gradle
+plugins {
+    id 'java-library'
+    id 'org.springframework.boot' version '3.4.2'
+    id 'io.spring.dependency-management' version '1.1.7'
+}
+```
+
+allow Spring Boot's dependency management to control compatible versions.
+
+Therefore, normally avoid doing this for Spring Boot-managed dependencies:
+
+```gradle
+implementation 'org.springframework.boot:spring-boot-starter-web:3.4.2'
+```
+
+Instead use:
+
+```gradle
+implementation 'org.springframework.boot:spring-boot-starter-web'
+```
+
+---
+
+## 4. dependencyInsight
+
+`dependencyInsight` is used to find out why Gradle selected a particular dependency version.
+
+Example:
+
+```bash
+gradlew.bat dependencyInsight --dependency checker-qual --configuration compileClasspath
+```
+
+It can help answer:
+
+```text
+Why is checker-qual:3.48.3 being used?
+```
+
+You may find something conceptually like:
+
+```text
+Library A
+    |
+    +-- checker-qual:3.48.3
+
+Library B
+    |
+    +-- checker-qual:3.43.0
+
+Gradle
+    |
+    +-- selected checker-qual:3.48.3
+```
+
+Another example:
+
+```bash
+gradlew.bat dependencyInsight --dependency jackson-databind --configuration runtimeClasspath
+```
+
+### dependencies vs dependencyInsight
+
+```text
+gradlew dependencies
+        |
+        +-- Shows the dependency tree
+```
+
+```text
+gradlew dependencyInsight
+        |
+        +-- Explains why a particular dependency/version
+            was selected
+```
+
+`dependencyInsight` is especially useful when debugging dependency conflicts.
+
+---
+
+## 5. Excluding Dependencies
+
+Sometimes a dependency brings another dependency transitively that you do not want.
+
+For example:
+
+```gradle
+implementation('org.springframework.boot:spring-boot-starter-thymeleaf') {
+    exclude group: 'org.apache.tomcat.embed', module: 'tomcat-embed-core'
+}
+```
+
+This means:
+
+```text
+spring-boot-starter-thymeleaf
+        |
+        +-- tomcat-embed-core
+                |
+                X excluded
+```
+
+The syntax is:
+
+```gradle
+exclude group: 'group-name', module: 'module-name'
+```
+
+Example:
+
+```gradle
+implementation('some.group:some-library:1.0') {
+    exclude group: 'org.example', module: 'some-module'
+}
+```
+
+Use exclusions when there is a specific reason, such as:
+
+```text
+unwanted transitive dependency
+duplicate implementation
+incompatible dependency
+security-related replacement
+providing an alternative implementation
+```
+
+Do not routinely exclude dependencies simply to make the dependency tree smaller.
+
+---
+
+## 6. Dependency Locking
+
+Dependency locking is used to make dependency versions reproducible.
+
+Without locking, dependency resolution may change when newer versions become available, depending on how dependencies are declared and managed.
+
+Dependency locking records the resolved dependency versions.
+
+Enable locking:
+
+```gradle
+dependencyLocking {
+    lockAllConfigurations()
+}
+```
+
+Generate dependency lock information:
+
+```bash
+gradlew.bat dependencies --write-locks
+```
+
+Gradle creates dependency lock information under:
+
+```text
+gradle/
+└── dependency-locks/
+```
+
+Conceptually:
+
+```text
+Project
+   |
+   +-- Spring version
+   +-- Jackson version
+   +-- Hibernate version
+   +-- Kafka version
+   +-- Other dependency versions
+          |
+          v
+      Locked versions
+```
+
+The purpose is to make builds more reproducible across different environments and at different points in time.
+
+---
+
+## 7. api vs implementation
+
+`api` and `implementation` are especially important when creating Java libraries.
+
+For a normal application, you generally use:
+
+```gradle
+implementation 'group:name:version'
+```
+
+When creating a library, use the `java-library` plugin:
+
+```gradle
+plugins {
+    id 'java-library'
+}
+```
+
+You can then use:
+
+```gradle
+api 'org.example:public-library:1.0'
+implementation 'org.example:internal-library:1.0'
+```
+
+### api
+
+Use `api` when the dependency is part of your library's public API.
+
+Conceptually:
+
+```text
+Your Library
+     |
+     +-- api dependency
+             |
+             v
+        Consumer can see it
+```
+
+For example, if your public method exposes a class from another library:
+
+```java
+public EmployeeRepository getRepository() {
+    return repository;
+}
+```
+
+and `EmployeeRepository` comes from another dependency, that dependency may need to be declared as:
+
+```gradle
+api 'org.example:repository-library:1.0'
+```
+
+### implementation
+
+Use `implementation` when the dependency is only an internal implementation detail.
+
+For example:
+
+```java
+private final InternalUtility utility;
+```
+
+If consumers do not need to access `InternalUtility`, use:
+
+```gradle
+implementation 'org.example:internal-utility:1.0'
+```
+
+Conceptually:
+
+```text
+api
+ |
+ +-- Part of public API
+ +-- Consumers can access the dependency
+
+
+implementation
+ |
+ +-- Internal implementation detail
+ +-- Consumers do not need it on their compile classpath
+```
+
+For your current project:
+
+```gradle
+plugins {
+    id 'java-library'
+}
+```
+
+means the project can use both:
+
+```gradle
+api
+```
+
+and:
+
+```gradle
+implementation
+```
+
+For example:
+
+```gradle
+dependencies {
+
+    implementation 'org.apache.commons:commons-lang3:3.18.0'
+
+    api 'com.google.guava:guava:33.3.1-jre'
+
+}
+```
+
+Here:
+
+```text
+commons-lang3
+     |
+     +-- implementation
+     +-- internal dependency
+
+
+guava
+     |
+     +-- api
+     +-- exposed to consumers
+```
+
+For a normal Spring Boot application rather than a reusable Java library, `implementation` is normally the preferred configuration.
+
+---
+
+## 8. details.requested and useVersion()
+
+`details.requested` is a Gradle property used inside dependency resolution rules. It represents the dependency request that Gradle is currently processing.
+
+For example:
+
+```gradle
+configurations.configureEach {
+    resolutionStrategy.eachDependency { details ->
+
+        if (details.requested.group == 'com.fasterxml.jackson.core' &&
+            details.requested.name == 'jackson-databind') {
+
+            details.useVersion('2.18.3')
+        }
+    }
+}
+```
+
+Here:
+
+```gradle
+details.requested
+```
+
+represents the dependency that some library or your project requested.
+
+### Example
+
+Suppose your dependency graph is:
+
+```text
+spring-boot-starter-web
+        |
+        +---- jackson-databind:2.18.2
+```
+
+Gradle processes the request:
+
+```text
+group    = com.fasterxml.jackson.core
+name     = jackson-databind
+version  = 2.18.2
+```
+
+So:
+
+```gradle
+details.requested.group
+```
+
+gives:
+
+```text
+com.fasterxml.jackson.core
+```
+
+```gradle
+details.requested.name
+```
+
+gives:
+
+```text
+jackson-databind
+```
+
+```gradle
+details.requested.version
+```
+
+gives:
+
+```text
+2.18.2
+```
+
+### Why is it useful?
+
+It lets you write rules such as:
+
+> "Whenever somebody requests this particular dependency, use a specific version."
+
+For example:
+
+```gradle
+configurations.configureEach {
+    resolutionStrategy.eachDependency { details ->
+
+        if (details.requested.group == 'com.fasterxml.jackson.core' &&
+            details.requested.name == 'jackson-databind') {
+
+            details.useVersion('2.18.3')
+        }
+    }
+}
+```
+
+Conceptually:
+
+```text
+Dependency requests:
+
+jackson-databind:2.17.0
+        ↓
+jackson-databind:2.18.2
+        ↓
+        ↓
+eachDependency
+        ↓
+details.requested
+        ↓
+"Is this jackson-databind?"
+        ↓
+YES
+        ↓
+useVersion("2.18.3")
+```
+
+### details.requested vs details.useVersion()
+
+They have opposite purposes:
+
+```text
+details.requested
+        ↓
+"What version was requested?"
+```
+
+```text
+details.useVersion(...)
+        ↓
+"What version should Gradle use instead?"
+```
+
+For example:
+
+```gradle
+if (details.requested.name == 'jackson-databind') {
+    details.useVersion('2.18.3')
+}
+```
+
+means:
+
+> If the requested dependency is `jackson-databind`, change the version Gradle will use to `2.18.3`.
+
+You can also inspect the reason.
+
+There are other useful properties/methods on `details`, such as:
+
+```gradle
+details.requested.group
+details.requested.name
+details.requested.version
+details.useVersion('...')
+details.because('...')
+```
+
+For example:
+
+```gradle
+details.useVersion('2.18.3')
+details.because('Use the approved Jackson version')
+```
+
+So the simple way to remember it is:
+
+```text
+details.requested
+    =
+the dependency declaration/request Gradle is currently resolving
+```
+
+### When is this useful?
+
+This is mainly an **advanced dependency resolution strategy**.
+
+For example, suppose:
+
+```text
+Library A
+    |
+    +-- jackson-databind:2.17.0
+
+Library B
+    |
+    +-- jackson-databind:2.18.2
+```
+
+You have a requirement:
+
+> Always use Jackson `2.18.3`.
+
+You can write:
+
+```gradle
+configurations.configureEach {
+    resolutionStrategy.eachDependency { details ->
+
+        if (details.requested.group == 'com.fasterxml.jackson.core' &&
+            details.requested.name == 'jackson-databind') {
+
+            details.useVersion('2.18.3')
+        }
+    }
+}
+```
+
+Conceptually:
+
+```text
+Requested                Used
+--------------------------------
+2.17.0      ───────────> 2.18.3
+2.18.2      ───────────> 2.18.3
+```
+
+Use `eachDependency` when you need **conditional/custom dependency resolution logic**.
+
+For a simple "always use this version" requirement, `force()` is simpler:
+
+```gradle
+configurations.configureEach {
+    resolutionStrategy {
+        force 'com.fasterxml.jackson.core:jackson-databind:2.18.3'
+    }
+}
+```
+
+For normal dependency management, prefer **BOMs, dependency constraints, and Spring Boot's dependency management** where appropriate.
+
+---
+
+## 9. Overall Dependency Management Flow
+
+The topics above can be viewed together as:
+
+```text
+Gradle Dependency Management
+│
+├── Transitive Dependencies
+│       └── Dependencies brought indirectly
+│
+├── Dependency Conflicts
+│       └── Multiple versions requested
+│
+├── BOM / Dependency Management
+│       └── Manage compatible versions
+│
+├── Dependency Insight
+│       └── Find why a version was selected
+│
+├── Dependency Exclusions
+│       └── Remove unwanted transitive dependencies
+│
+├── Dependency Constraints
+│       └── Constrain dependency versions
+│
+├── Dependency Locking
+│       └── Keep tested/resolved versions
+│
+├── api vs implementation
+│       └── Control library dependency exposure
+│
+└── Resolution Strategy
+        ├── failOnVersionConflict()
+        ├── force()
+        ├── eachDependency
+        │      ├── details.requested
+        │      └── details.useVersion()
+        └── Other resolution rules
+```
