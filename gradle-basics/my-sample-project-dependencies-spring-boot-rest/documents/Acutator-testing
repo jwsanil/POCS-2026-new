@@ -1,0 +1,294 @@
+# Spring Boot Actuator — Health, Memory, Heap Dump, Threads, and Other Endpoints
+
+Spring Boot Actuator itself is working. `DOWN` means that one or more health indicators (often a database or another external dependency) is reporting a failure.
+
+1. First check the detailed health
+
+In application.properties:
+
+management.endpoint.health.show-details=always
+
+Then call:
+
+http://localhost:8082/actuator/health
+
+You should get something like:
+
+{
+  "status": "DOWN",
+  "components": {
+    "db": {
+      "status": "DOWN",
+      "details": {
+        "error": "..."
+      }
+    },
+    "diskSpace": {
+      "status": "UP"
+    }
+  }
+}
+
+2. If db is DOWN
+
+This is very likely if you recently added Spring Boot JDBC / H2 / PostgreSQL.
+
+For example, if you have:
+
+implementation 'org.springframework.boot:spring-boot-starter-jdbc'
+runtimeOnly 'com.h2database:h2'
+
+Spring Boot automatically creates a database health check. If the datasource cannot connect, /actuator/health becomes DOWN.
+
+Check your application.properties.
+
+For H2, for example:
+
+spring.datasource.url=jdbc:h2:mem:testdb
+spring.datasource.driver-class-name=org.h2.Driver
+spring.datasource.username=sa
+spring.datasource.password=
+
+3. If you don't need database health
+
+If your application doesn't actually use a database yet, you can disable the DB health indicator:
+
+management.health.db.enabled=false
+
+Then:
+
+http://localhost:8082/actuator/health
+
+should report UP as long as the other health indicators are healthy.
+
+Important:
+
+Don't just disable the health check if your application needs the database. In that case, DOWN is useful because it tells you that the application cannot currently reach its database.
+
+
+# Spring Boot Actuator — More Monitoring Data
+
+Spring Boot Actuator can expose several useful endpoints for:
+
+- Application memory
+- JVM metrics
+- Thread information
+- Heap dump
+- Spring beans
+- Request mappings
+- Environment/configuration
+- Loggers
+- Application health
+
+
+1. Expose the endpoints
+
+In application.properties:
+
+# Expose Actuator endpoints
+management.endpoints.web.exposure.include=health,info,metrics,loggers,threaddump,heapdump,mappings,env,beans
+
+Then restart your application.
+
+You can see the available endpoints at:
+
+http://localhost:8082/actuator
+
+
+2. Application memory / JVM memory
+
+Use:
+
+http://localhost:8082/actuator/metrics/jvm.memory.used
+
+Other useful JVM memory metrics:
+
+http://localhost:8082/actuator/metrics/jvm.memory.committed
+
+http://localhost:8082/actuator/metrics/jvm.memory.max
+
+You can also see the different memory areas.
+
+Heap:
+
+http://localhost:8082/actuator/metrics/jvm.memory.used?tag=area:heap
+
+Non-heap:
+
+http://localhost:8082/actuator/metrics/jvm.memory.used?tag=area:nonheap
+
+For example, the response can contain:
+
+{
+  "name": "jvm.memory.used",
+  "measurements": [
+    {
+      "statistic": "VALUE",
+      "value": 1.2345678E8
+    }
+  ],
+  "availableTags": []
+}
+
+The value is in bytes.
+
+
+3. See all available metrics
+
+Go to:
+
+http://localhost:8082/actuator/metrics
+
+You'll get metric names such as:
+
+jvm.memory.used
+jvm.memory.committed
+jvm.memory.max
+jvm.gc.live.data.size
+jvm.gc.memory.allocated
+jvm.threads.live
+jvm.threads.daemon
+process.cpu.usage
+process.memory.used
+system.cpu.usage
+
+Then query an individual metric:
+
+/actuator/metrics/{metric-name}
+
+For example:
+
+http://localhost:8082/actuator/metrics/jvm.threads.live
+
+
+4. Heap dump
+
+Actuator provides:
+
+http://localhost:8082/actuator/heapdump
+
+This is different from the metrics endpoint.
+
+It generates a JVM heap dump (.hprof) that you can open with tools such as:
+
+- IntelliJ IDEA
+- Eclipse MAT
+- VisualVM
+- JDK Mission Control
+
+The heap dump lets you investigate which objects are consuming memory.
+
+For example:
+
+Java Heap
+ ├── byte[]
+ ├── java.lang.String
+ ├── HashMap
+ ├── Customer
+ ├── Employee
+ └── ...
+
+
+5. Thread dump
+
+Use:
+
+http://localhost:8082/actuator/threaddump
+
+This is useful for finding:
+
+- Blocked threads
+- Waiting threads
+- Deadlocks
+- Thread pools
+- Running threads
+
+
+6. Application beans
+
+To see the Spring beans:
+
+http://localhost:8082/actuator/beans
+
+For example:
+
+SampleController
+DataSource
+JdbcTemplate
+HikariDataSource
+...
+
+
+7. Application configuration / environment
+
+http://localhost:8082/actuator/env
+
+This shows Spring's environment and property sources.
+
+Be careful with this endpoint because it can expose configuration information. Don't expose it publicly in production without proper security.
+
+
+8. Request mappings
+
+To see all your controller mappings:
+
+http://localhost:8082/actuator/mappings
+
+For example:
+
+GET /status
+GET /actuator/health
+GET /customers
+POST /customers
+
+
+9. Log levels
+
+You can inspect logger configuration:
+
+http://localhost:8082/actuator/loggers
+
+And a particular logger:
+
+http://localhost:8082/actuator/loggers/org.springframework.web
+
+
+10. Useful Actuator configuration for development
+
+For your current local Spring Boot application:
+
+# Actuator
+management.endpoints.web.exposure.include=health,info,metrics,loggers,threaddump,heapdump,mappings,beans,env
+
+# Show health details
+management.endpoint.health.show-details=always
+
+
+Then your main URLs are:
+
+Purpose                         Endpoint
+
+Overall health                  /actuator/health
+All metrics                    /actuator/metrics
+Heap used                      /actuator/metrics/jvm.memory.used
+Heap committed                 /actuator/metrics/jvm.memory.committed
+Maximum heap                   /actuator/metrics/jvm.memory.max
+Threads                        /actuator/metrics/jvm.threads.live
+CPU                            /actuator/metrics/process.cpu.usage
+Heap dump                      /actuator/heapdump
+Thread dump                    /actuator/threaddump
+Spring beans                   /actuator/beans
+Environment                    /actuator/env
+URL mappings                   /actuator/mappings
+Loggers                        /actuator/loggers
+
+
+Most important endpoints for memory troubleshooting:
+
+/actuator/metrics/jvm.memory.used
+/actuator/metrics/jvm.memory.max
+/actuator/heapdump
+
+Metrics tell you how much memory is being used.
+
+Heap dump helps you investigate what is using that memory.
